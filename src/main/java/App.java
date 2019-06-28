@@ -1,3 +1,6 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 /*
@@ -7,6 +10,10 @@ public class App {
     private ItemRepository itemRepository;
     private SalesPromotionRepository salesPromotionRepository;
 
+    public App() {
+
+    }
+
     public App(ItemRepository itemRepository, SalesPromotionRepository salesPromotionRepository) {
         this.itemRepository = itemRepository;
         this.salesPromotionRepository = salesPromotionRepository;
@@ -14,7 +21,97 @@ public class App {
 
     public String bestCharge(List<String> inputs) {
         //TODO: write code here
-
-        return null;
+        double totalSum = 0;
+        double totalSumWithNotDisCount = 0;
+        double saveMoney = 0;
+        String message = "";
+        HashMap<String, Integer> data = new HashMap<>();
+        HashMap<String, Item> data2 = new HashMap<>();
+        List<String> inputList = new ArrayList<>();
+        for (String input: inputs) {
+            String[] strs = input.split(" ");
+            data.put(strs[0], Integer.valueOf(strs[2]));
+            inputList.add(strs[0]);
+        }
+        List<Item> items = this.itemRepository.findAll();
+        List<SalesPromotion> sps = this.salesPromotionRepository.findAll();
+        int[] discounts = new int[inputs.size()];//0:没有折扣，1：半价
+        boolean isDiscount = false;
+        if (sps.get(1).getRelatedItems().size() > 0) {
+            String[] relatedItems = (String[]) sps.get(1).getRelatedItems().toArray();
+            int i = 0;
+            for (String key: inputList) {
+                int index = Arrays.binarySearch(relatedItems, key);
+                if (index >= 0) {
+                    isDiscount = true;
+                    discounts[i] = 1;
+                }
+                i++;
+            }
+        }
+        int j = 0;
+        if (isDiscount) {
+            //有半价
+            for (String key: inputList) {
+                for (Item item: items) {
+                    if (item.getId().equals(key)) {
+                        if (discounts[j] == 1) {
+                            totalSum = totalSum + (item.getPrice() / 2 * data.get(key));
+                            saveMoney = saveMoney + (item.getPrice() / 2 * data.get(key));
+                        } else {
+                            totalSum += item.getPrice() * data.get(key);
+                        }
+                        totalSumWithNotDisCount += item.getPrice() * data.get(key);
+                        data2.put(key, item);
+                        break;
+                    }
+                }
+                j++;
+            }
+        } else {
+            //没有半价
+            for (String key: inputList) {
+                for (Item item: items) {
+                    if (item.getId().equals(key)) {
+                        totalSum += item.getPrice() * data.get(key);
+                        totalSumWithNotDisCount += item.getPrice() * data.get(key);
+                        data2.put(key, item);
+                        break;
+                    }
+                }
+                j++;
+            }
+        }
+        if (totalSumWithNotDisCount >= 30) {
+            if (saveMoney < 6) {
+                totalSum = totalSumWithNotDisCount - 6;
+                isDiscount = false;
+            }
+        }
+        message += "============= 订餐明细 =============\n";
+        for (String key : inputList) {
+            message += data2.get(key).getName() + " x " + data.get(key) + " = " + (int)(data2.get(key).getPrice() * data.get(key)) + "元\n";
+        }
+        if (saveMoney > 0) {
+            message += "-----------------------------------\n";
+            message += "使用优惠:\n";
+            if (isDiscount) {
+                message += sps.get(1).getDisplayName() + "(";
+                for (int z = 0; z < discounts.length; z++) {
+                    if (discounts[z] == 1 && z != discounts.length - 1) {
+                        message += data2.get(inputList.toArray()[z]).getName() + "，";
+                    } else if (discounts[z] == 1 && z == discounts.length - 1){
+                        message += data2.get(inputList.toArray()[z]).getName();
+                    }
+                }
+                message += ")，省" + (int)saveMoney + "元\n";
+            } else {
+               message += "满30减6元，省6元\n";
+            }
+        }
+        message += "-----------------------------------\n";
+        message += "总计：" + (int)totalSum + "元\n";
+        message += "===================================";
+        return message;
     }
 }
